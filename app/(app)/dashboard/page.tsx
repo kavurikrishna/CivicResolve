@@ -121,7 +121,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Welcome back, Manvit Krishna! 👋
+                Welcome to your Civic Dashboard 👋
               </h2>
             </div>
             <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-2">

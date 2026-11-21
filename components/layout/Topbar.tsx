@@ -126,10 +126,10 @@ export default function Topbar({ title, subtitle, actions }: TopbarProps) {
           <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
         </div>
 
-        {/* User Avatar (MK) */}
+        {/* User Avatar / CivicResolve Citizen (CR) */}
         <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all">
-            MK
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all" title="CivicResolve Citizen">
+            CR
           </div>
         </div>
       </div>
