@@ -1,33 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Complaint } from '@/lib/types';
+import {
+  ADMIN_COOKIE_NAME,
+  verifySessionToken,
+  validateCsrfOrigin,
+} from '@/lib/security';
+import { sanitizeInput } from '@/lib/utils';
+import { ComplaintStatus } from '@/lib/types';
 
-// Admin status update endpoint - server-side authorization check
+// Admin status update endpoint - protected by cryptographically signed server sessions
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { complaintId, status, note, adminToken } = body;
-
-    // Authorization check - verify admin token
-    const validAdminToken = process.env.ADMIN_SECRET || 'civicresolve-admin-2024';
-    if (!adminToken || adminToken !== validAdminToken) {
+    // 1. CSRF Protection
+    if (!validateCsrfOrigin(request)) {
       return NextResponse.json(
-        { error: 'Unauthorized: Invalid admin credentials' },
+        { error: 'Forbidden: Invalid request origin' },
+        { status: 403 }
+      );
+    }
+
+    // 2. Session Authentication: Check signed HttpOnly cookie (or Bearer token)
+    const sessionCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    const authHeader = request.headers.get('authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const token = sessionCookie || bearerToken;
+
+    const session = verifySessionToken(token);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized: Valid administrative session required' },
         { status: 401 }
       );
     }
 
-    // Validate inputs
-    if (!complaintId || !status || !note) {
+    // 3. Payload parsing & validation
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
+    }
+
+    const { complaintId, status, note, department } = body;
+
+    if (!complaintId || typeof complaintId !== 'string') {
+      return NextResponse.json({ error: 'Valid complaint ID is required' }, { status: 400 });
+    }
+
+    const validStatuses: ComplaintStatus[] = ['reported', 'in_progress', 'resolved'];
+    if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
         { status: 400 }
       );
     }
 
-    const validStatuses = ['reported', 'in_progress', 'resolved'];
-    if (!validStatuses.includes(status)) {
+    if (!note || typeof note !== 'string' || note.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Invalid status value' },
+        { error: 'Mandatory administrative note is required' },
         { status: 400 }
       );
     }
@@ -39,20 +68,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In a production system, this would update Firestore/database
-    // For demo mode, we return success and let the client handle storage
+    const sanitizedNote = sanitizeInput(note);
+    const sanitizedDept = department ? sanitizeInput(String(department)) : undefined;
+
     return NextResponse.json({
       success: true,
       message: 'Status updated successfully',
-      complaintId,
+      complaintId: sanitizeInput(complaintId),
       status,
+      department: sanitizedDept,
+      note: sanitizedNote,
+      updatedBy: session.sub,
       updatedAt: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error('Status update error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'An unexpected internal error occurred' },
       { status: 500 }
     );
   }

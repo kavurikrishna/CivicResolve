@@ -6,11 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+let idSequenceCounter = Math.floor(Math.random() * 80000) + 10000;
+
 export function generateComplaintId(): string {
   const prefix = 'CIV';
   const year = new Date().getFullYear();
-  const random = Math.floor(Math.random() * 90000) + 10000;
-  return `${prefix}-${year}-${random}`;
+  idSequenceCounter = ((idSequenceCounter + 1 - 10000) % 90000) + 10000;
+  return `${prefix}-${year}-${idSequenceCounter}`;
 }
 
 export function formatDate(dateString: string): string {
@@ -107,10 +109,16 @@ export const DEPARTMENTS = [
 
 export function validateFileUpload(file: File): { valid: boolean; error?: string } {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
   const maxSize = 5 * 1024 * 1024; // 5MB
 
-  if (!allowedTypes.includes(file.type)) {
-    return { valid: false, error: 'Only JPEG, PNG, WebP, and GIF images are allowed.' };
+  if (!file || !file.name) {
+    return { valid: false, error: 'Invalid file provided.' };
+  }
+
+  const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+  if (!allowedExtensions.includes(ext) || !allowedTypes.includes(file.type)) {
+    return { valid: false, error: 'Only JPEG, PNG, WebP, and GIF images are allowed. SVGs and executables are rejected.' };
   }
   if (file.size > maxSize) {
     return { valid: false, error: 'File size must be less than 5MB.' };
@@ -119,8 +127,11 @@ export function validateFileUpload(file: File): { valid: boolean; error?: string
 }
 
 export function sanitizeInput(input: string): string {
+  if (typeof input !== 'string') return '';
   return input
     .replace(/[<>]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/data:text\/html/gi, '')
     .trim()
     .slice(0, 2000);
 }

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateCsrfOrigin } from '@/lib/security';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 interface GeminiAnalysisRequest {
   title: string;
@@ -85,34 +87,56 @@ function validateAnalysis(data: Record<string, unknown>) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: GeminiAnalysisRequest = await request.json();
+    // 1. CSRF Origin Verification
+    if (!validateCsrfOrigin(request)) {
+      return NextResponse.json({ error: 'Forbidden: Invalid request origin' }, { status: 403 });
+    }
+
+    // 2. Rate Limiting (30 requests per minute per IP to protect downstream APIs)
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`ai_analyze:${clientIp}`, 30, 60);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many requests. Please retry in ${rateLimit.reset} seconds.` },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.reset) } }
+      );
+    }
+
+    // 3. Payload parsing & size check
+    let body: GeminiAnalysisRequest;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
+    }
+
     const { title, description, location, category } = body;
 
-    // Input validation
-    if (!title || !description || !location) {
+    // 4. Strict input validation
+    if (!title || typeof title !== 'string' || !description || typeof description !== 'string' || !location || typeof location !== 'string') {
       return NextResponse.json(
-        { error: 'Missing required fields: title, description, location' },
+        { error: 'Missing or invalid required fields: title, description, location' },
         { status: 400 }
       );
     }
 
     if (title.length > 200 || description.length > 5000 || location.length > 300) {
       return NextResponse.json(
-        { error: 'Input exceeds maximum length' },
+        { error: 'Input exceeds maximum allowed length' },
         { status: 400 }
       );
     }
 
-    // Sanitize inputs
+    // 5. Sanitize inputs
     const sanitizedTitle = title.replace(/[<>]/g, '').trim();
     const sanitizedDesc = description.replace(/[<>]/g, '').trim();
     const sanitizedLocation = location.replace(/[<>]/g, '').trim();
+    const sanitizedCategory = category && typeof category === 'string' ? category.replace(/[<>]/g, '').trim() : undefined;
 
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.length < 20) {
-      console.log('Gemini API key not configured, using fallback classification');
-      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, category);
+      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, sanitizedCategory);
       return NextResponse.json(fallback);
     }
 
@@ -121,37 +145,43 @@ export async function POST(request: NextRequest) {
 Title: ${sanitizedTitle}
 Description: ${sanitizedDesc}
 Location: ${sanitizedLocation}
-${category && category !== 'Auto-detect' ? `Reported Category: ${category}` : ''}
+${sanitizedCategory && sanitizedCategory !== 'Auto-detect' ? `Reported Category: ${sanitizedCategory}` : ''}
 
 Provide your analysis as JSON.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: SYSTEM_PROMPT + '\n\n' + userPrompt }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 0.8,
-            maxOutputTokens: 500,
-          },
-        }),
-      }
-    );
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: SYSTEM_PROMPT + '\n\n' + userPrompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              topK: 1,
+              topP: 0.8,
+              maxOutputTokens: 500,
+            },
+          }),
+        }
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error('Gemini API error:', response.status, errText);
-      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, category);
+      console.warn('Gemini API status not OK, switching to fallback classification:', response.status);
+      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, sanitizedCategory);
       return NextResponse.json(fallback);
     }
 
@@ -159,27 +189,24 @@ Provide your analysis as JSON.`;
     const content = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
-      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, category);
+      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, sanitizedCategory);
       return NextResponse.json(fallback);
     }
 
     // Parse JSON from Gemini response
     let parsed: Record<string, unknown>;
     try {
-      // Remove any markdown code blocks if present
       const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parsed = JSON.parse(cleaned);
     } catch {
-      console.error('Failed to parse Gemini response:', content);
-      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, category);
+      const fallback = getFallbackAnalysis(sanitizedTitle, sanitizedDesc, sanitizedCategory);
       return NextResponse.json(fallback);
     }
 
     const validated = validateAnalysis(parsed);
     return NextResponse.json({ ...validated, is_fallback: false });
-
-  } catch (error) {
-    console.error('AI analysis error:', error);
+  } catch (error: any) {
+    console.error('AI analysis service error:', error?.message || error);
     return NextResponse.json(
       { error: 'Analysis service temporarily unavailable' },
       { status: 503 }

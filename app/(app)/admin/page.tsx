@@ -18,6 +18,7 @@ import {
   Flame,
   Check,
   Filter,
+  LogOut,
 } from 'lucide-react';
 import { getStoredComplaints, updateComplaintStatus, updateComplaintDepartment, getDashboardStats } from '@/lib/storage';
 import { Complaint, ComplaintStatus, ComplaintPriority } from '@/lib/types';
@@ -27,8 +28,6 @@ import { StatCard } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Topbar from '@/components/layout/Topbar';
 import toast from 'react-hot-toast';
-
-const ADMIN_TOKEN = 'civicresolve-admin-2024';
 
 export default function AdminPage() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -43,6 +42,7 @@ export default function AdminPage() {
   const [newDepartment, setNewDepartment] = useState('');
   const [updating, setUpdating] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [authError, setAuthError] = useState('');
   const [emergencyMode, setEmergencyMode] = useState(false);
@@ -53,25 +53,64 @@ export default function AdminPage() {
     setStats(getDashboardStats());
   };
 
+  // Verify server-side signed HttpOnly session on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const session = sessionStorage.getItem('admin_session');
-      if (session === ADMIN_TOKEN) {
-        setIsAuthorized(true);
-        loadData();
+    const checkServerSession = async () => {
+      try {
+        const res = await fetch('/api/admin/session', { cache: 'no-store' });
+        const data = await res.json();
+        if (data.authenticated) {
+          setIsAuthorized(true);
+          loadData();
+        }
+      } catch {
+        // Unauthenticated
       }
-    }
+    };
+    checkServerSession();
   }, []);
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPass === ADMIN_TOKEN || adminPass === 'admin') {
+    if (!adminPass) {
+      setAuthError('Please enter administrator password');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPass }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || 'Authentication rejected');
+        return;
+      }
+
       setIsAuthorized(true);
-      sessionStorage.setItem('admin_session', ADMIN_TOKEN);
+      setAdminPass('');
       loadData();
       toast.success('Admin authorization verified');
-    } else {
-      setAuthError('Invalid credentials. (Hint: civicresolve-admin-2024)');
+    } catch {
+      setAuthError('Unable to connect to authentication service');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST' });
+    } catch {
+      // Ignore
+    } finally {
+      setIsAuthorized(false);
+      toast.success('Signed out of admin session');
     }
   };
 
@@ -108,7 +147,7 @@ export default function AdminPage() {
           complaintId: selectedComplaint.id,
           status: newStatus,
           note: updateNote.trim(),
-          adminToken: ADMIN_TOKEN,
+          department: newDepartment,
         }),
       });
 
@@ -198,13 +237,13 @@ export default function AdminPage() {
                 {authError && <p className="text-xs text-rose-600 mt-1.5">{authError}</p>}
               </div>
 
-              <Button type="submit" className="w-full" size="md">
+              <Button type="submit" className="w-full" size="md" loading={authLoading}>
                 Authenticate & Enter
               </Button>
 
               <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-blue-700">
-                <strong>Demo credentials:</strong> <br />
-                Password: <span className="font-mono font-bold">civicresolve-admin-2024</span>
+                <strong>Protected Access:</strong> <br />
+                Requires valid server-side administrator secret. Sessions are signed with secure HttpOnly cookies.
               </div>
             </form>
           </div>
@@ -234,6 +273,13 @@ export default function AdminPage() {
             >
               <RefreshCw size={13} />
               <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 cursor-pointer shadow-2xs"
+            >
+              <LogOut size={13} />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         }
