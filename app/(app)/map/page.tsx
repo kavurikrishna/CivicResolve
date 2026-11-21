@@ -92,16 +92,19 @@ export default function MapPage() {
               {/* Priority Filter */}
               <div className="space-y-1.5">
                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Priority</span>
-                {[
-                  { key: 'all', label: 'All Priorities', color: 'bg-slate-400' },
-                  { key: 'Critical', label: 'Critical', color: 'bg-rose-500' },
-                  { key: 'High', label: 'High', color: 'bg-amber-500' },
-                  { key: 'Medium', label: 'Medium', color: 'bg-blue-500' },
-                  { key: 'Low', label: 'Low', color: 'bg-emerald-500' },
-                ].map((item) => (
+                {(
+                  [
+                    { key: 'all', label: 'All Priorities', color: 'bg-slate-400' },
+                    { key: 'Critical', label: 'Critical', color: 'bg-rose-500' },
+                    { key: 'High', label: 'High', color: 'bg-amber-500' },
+                    { key: 'Medium', label: 'Medium', color: 'bg-blue-500' },
+                    { key: 'Low', label: 'Low', color: 'bg-emerald-500' },
+                  ] as const
+                ).map((item) => (
                   <button
                     key={item.key}
-                    onClick={() => setPriorityFilter(item.key as any)}
+                    type="button"
+                    onClick={() => setPriorityFilter(item.key)}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
                       priorityFilter === item.key ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
                     }`}
@@ -118,14 +121,17 @@ export default function MapPage() {
               {/* Status Filter matching template */}
               <div className="space-y-1.5 mt-6 pt-4 border-t border-slate-100">
                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Status</span>
-                {[
-                  { key: 'all', label: 'All Statuses' },
-                  { key: 'in_progress', label: 'In Progress' },
-                  { key: 'resolved', label: 'Resolved' },
-                ].map((item) => (
+                {(
+                  [
+                    { key: 'all', label: 'All Statuses' },
+                    { key: 'in_progress', label: 'In Progress' },
+                    { key: 'resolved', label: 'Resolved' },
+                  ] as const
+                ).map((item) => (
                   <button
                     key={item.key}
-                    onClick={() => setStatusFilter(item.key as any)}
+                    type="button"
+                    onClick={() => setStatusFilter(item.key)}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
                       statusFilter === item.key ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
                     }`}

@@ -33,21 +33,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Payload parsing & validation
-    let body: any;
+    let body: { complaintId?: unknown; status?: unknown; note?: unknown; department?: unknown };
     try {
-      body = await request.json();
+      body = (await request.json()) as { complaintId?: unknown; status?: unknown; note?: unknown; department?: unknown };
     } catch {
       return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
     }
 
-    const { complaintId, status, note, department } = body;
+    const { complaintId, status, note, department } = body || {};
 
     if (!complaintId || typeof complaintId !== 'string') {
       return NextResponse.json({ error: 'Valid complaint ID is required' }, { status: 400 });
     }
 
     const validStatuses: ComplaintStatus[] = ['reported', 'in_progress', 'resolved'];
-    if (!status || !validStatuses.includes(status)) {
+    if (!status || typeof status !== 'string' || !validStatuses.includes(status as ComplaintStatus)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
         { status: 400 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Search,
@@ -33,12 +33,7 @@ function TrackContent() {
   const [notFound, setNotFound] = useState(false);
   const [rating, setRating] = useState<number>(5);
 
-  useEffect(() => {
-    const id = searchParams.get('id') || 'CIV-2024-10001';
-    handleSearch(id);
-  }, [searchParams]);
-
-  const handleSearch = (idToSearch?: string) => {
+  const handleSearch = useCallback((idToSearch?: string) => {
     const target = (idToSearch || searchId).trim().toUpperCase();
     if (!target) return;
     setSearchId(target);
@@ -50,7 +45,12 @@ function TrackContent() {
       setComplaint(null);
       setNotFound(true);
     }
-  };
+  }, [searchId]);
+
+  useEffect(() => {
+    const id = searchParams.get('id') || 'CIV-2024-10001';
+    handleSearch(id);
+  }, [searchParams, handleSearch]);
 
   const getStepStatus = (stepName: 'reported' | 'in_progress' | 'resolved') => {
     if (!complaint) return false;
@@ -144,9 +144,11 @@ function TrackContent() {
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={handlePrint}
                     className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
                     title="Print Receipt"
+                    aria-label="Print complaint receipt"
                   >
                     <Printer size={15} />
                   </button>
@@ -266,8 +268,10 @@ function TrackContent() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => toast.success('Officer contacted. Expect callback within 15 mins.')}
                     className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    aria-label="Contact assigned municipal officer"
                   >
                     <PhoneCall size={12} /> Contact
                   </button>
@@ -284,7 +288,9 @@ function TrackContent() {
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
+                        type="button"
                         key={star}
+                        aria-label={`Rate resolution ${star} of 5 stars`}
                         onClick={() => {
                           setRating(star);
                           toast.success(`Thank you for rating ${star} stars!`);

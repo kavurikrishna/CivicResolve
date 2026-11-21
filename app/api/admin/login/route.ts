@@ -39,14 +39,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Payload validation
-    let body: any;
+    let body: { password?: unknown };
     try {
-      body = await request.json();
+      body = (await request.json()) as { password?: unknown };
     } catch {
       return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
     }
 
-    const { password } = body;
+    const { password } = body || {};
     if (!password || typeof password !== 'string') {
       return NextResponse.json(
         { error: 'Password is required' },
@@ -58,8 +58,9 @@ export async function POST(request: NextRequest) {
     let secret: string;
     try {
       secret = getAdminSecret();
-    } catch (err: any) {
-      console.error('CRITICAL SERVER AUTH ERROR:', err.message);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('CRITICAL SERVER AUTH ERROR:', errMsg);
       return NextResponse.json(
         { error: 'Authentication service configuration failure' },
         { status: 500 }

@@ -167,8 +167,9 @@ export default function AdminPage() {
         toast.success('Complaint status updated successfully!');
         setUpdateNote('');
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Update failed');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Update failed';
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }
@@ -396,7 +397,8 @@ export default function AdminPage() {
 
                 <select
                   value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value as any)}
+                  onChange={(e) => setPriorityFilter(e.target.value as 'all' | ComplaintPriority)}
+                  aria-label="Filter complaints by priority"
                   className="px-2 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none"
                 >
                   <option value="all">All</option>

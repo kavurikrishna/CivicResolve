@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import type { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
 import { Complaint } from '@/lib/types';
 
 interface MapComponentProps {
@@ -18,14 +19,16 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function MapComponent({ complaints, onSelect, selected }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const markersRef = useRef<LeafletMarker[]>([]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
     import('leaflet').then((L) => {
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      // Fix default Leaflet icon paths in Next.js bundler
+      const proto = L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown };
+      delete proto._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
         iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -86,6 +89,8 @@ export default function MapComponent({ complaints, onSelect, selected }: MapComp
           iconAnchor: [14, 28],
         });
 
+        if (!mapInstanceRef.current) return;
+
         const marker = L.marker([complaint.lat, complaint.lng], { icon })
           .addTo(mapInstanceRef.current)
           .on('click', () => onSelect(complaint));
@@ -95,5 +100,13 @@ export default function MapComponent({ complaints, onSelect, selected }: MapComp
     });
   }, [complaints, onSelect]);
 
-  return <div ref={mapRef} className="w-full h-full min-h-[460px] rounded-2xl" style={{ zIndex: 0 }} />;
+  return (
+    <div
+      ref={mapRef}
+      role="region"
+      aria-label="Interactive city infrastructure map"
+      className="w-full h-full min-h-[460px] rounded-2xl"
+      style={{ zIndex: 0 }}
+    />
+  );
 }

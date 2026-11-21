@@ -59,6 +59,7 @@ export default function Topbar({ title, subtitle, actions }: TopbarProps) {
             <input
               ref={searchInputRef}
               type="text"
+              aria-label="Search complaints, IDs, areas"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -121,14 +122,25 @@ export default function Topbar({ title, subtitle, actions }: TopbarProps) {
         </Link>
 
         {/* Notification Bell */}
-        <div className="relative w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center cursor-pointer transition-colors">
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="View notifications"
+          className="relative w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center cursor-pointer transition-colors"
+        >
           <Bell size={16} className="text-slate-600" />
           <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
         </div>
 
         {/* User Avatar / CivicResolve Citizen (CR) */}
         <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all" title="CivicResolve Citizen">
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="CivicResolve citizen profile"
+            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+            title="CivicResolve Citizen"
+          >
             CR
           </div>
         </div>

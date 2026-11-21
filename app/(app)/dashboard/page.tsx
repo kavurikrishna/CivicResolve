@@ -193,14 +193,18 @@ export default function DashboardPage() {
 
               {/* Time Range Pills */}
               <div className="flex items-center gap-1 p-1 bg-slate-50 border border-slate-200/80 rounded-xl">
-                {[
-                  { key: '7d', label: '7D' },
-                  { key: '30d', label: '30D' },
-                  { key: '90d', label: '90D' },
-                ].map((t) => (
+                {(
+                  [
+                    { key: '7d', label: '7D' },
+                    { key: '30d', label: '30D' },
+                    { key: '90d', label: '90D' },
+                  ] as const
+                ).map((t) => (
                   <button
                     key={t.key}
-                    onClick={() => setTimeRange(t.key as any)}
+                    type="button"
+                    onClick={() => setTimeRange(t.key)}
+                    aria-label={`Show ${t.label} trend data`}
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       timeRange === t.key ? 'bg-white text-blue-600 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'
                     }`}

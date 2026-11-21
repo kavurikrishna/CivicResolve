@@ -205,8 +205,9 @@ Provide your analysis as JSON.`;
 
     const validated = validateAnalysis(parsed);
     return NextResponse.json({ ...validated, is_fallback: false });
-  } catch (error: any) {
-    console.error('AI analysis service error:', error?.message || error);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('AI analysis service error:', errorMsg);
     return NextResponse.json(
       { error: 'Analysis service temporarily unavailable' },
       { status: 503 }
