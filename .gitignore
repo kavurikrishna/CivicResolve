@@ -19,3 +19,6 @@ coverage/
 *.tgz
 *.lock
 !package-lock.json
+
+.vercel
+.env*
